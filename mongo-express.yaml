@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-express-config
+  namespace: mongo-express
+data:
+  ME_CONFIG_MONGODB_SERVER: mongodb-service.mongodb.svc.cluster.local
+  ME_CONFIG_MONGODB_PORT: "27017"
+  ME_CONFIG_MONGODB_URL: mongodb://admin:admin123@mongodb-service.mongodb.svc.cluster.local:27017/
+  ME_CONFIG_BASICAUTH_USERNAME: admin
+  ME_CONFIG_BASICAUTH_PASSWORD: admin123
+  ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+  ME_CONFIG_MONGODB_ADMINPASSWORD: admin123
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-express-deployment
+  namespace: mongo-express
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-express
+  template:
+    metadata:
+      labels:
+        app: mongo-express
+    spec:
+      containers:
+        - name: mongo-express
+          image: mongo-express:latest
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: mongo-express-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-express-service
+  namespace: mongo-express
+spec:
+  selector:
+    app: mongo-express
+  type: NodePort
+  ports:
+    - name: http
+      port: 8081
+      targetPort: 8081
+      nodePort: 32081
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mongodb-allow-mongo-express
+  namespace: mongodb
+spec:
+  podSelector:
+    matchLabels:
+      app: mongodb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mongo-express
+      ports:
+        - port: 27017
+          protocol: TCP
+
